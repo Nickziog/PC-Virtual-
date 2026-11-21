@@ -1,57 +1,40 @@
-name: Virtual PC Online
+name: Windows RDP Online
 
 on:
   workflow_dispatch:
     inputs:
       access_password:
-        description: 'Set a password for the user (minimum 6 characters)'
+        description: 'Orise kwdiko RDP (toulaxiston 8 xaraktires)'
         required: true
-        default: '123456'
+        default: 'Nick@2026!'
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 360
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Configure User Password
+      - name: Configure Windows User Password
         run: |
-          echo "runner:${{ github.event.inputs.access_password }}" | sudo chpasswd
-          sudo usermod -aG sudo runner
+          net user runneradmin "${{ github.event.inputs.access_password }}"
 
-      - name: Install Desktop Server & VNC
+      - name: Enable Remote Desktop (RDP)
         run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xfce4 xfce4-goodies tigervnc-standalone-server dbus-x11 firefox
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
 
-      - name: Connect Tailscale
+      - name: Install & Connect Tailscale
         uses: tailscale/github-action@v3
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: Start VNC Server
+      - name: Show RDP Info & Keep Active
         run: |
-          mkdir -p ~/.vnc
-          echo "${{ github.event.inputs.access_password }}" | vncpasswd -f > ~/.vnc/passwd
-          chmod 600 ~/.vnc/passwd
-          cat << 'EOF' > ~/.vnc/xstartup
-          #!/bin/sh
-          unset SESSION_MANAGER
-          unset DBUS_SESSION_BUS_ADDRESS
-          exec startxfce4
-          EOF
-          chmod +x ~/.vnc/xstartup
-          vncserver :1 -geometry 1280x720 -depth 24 -localhost no
-          echo "VNC Server started on port 5901"
-
-      - name: Show VNC Info & Keep Active
-        run: |
-          IP=$(tailscale ip -4)
-          echo "=========================================="
-          echo "VNC Address (vale to sto RealVNC Viewer): ${IP}:5901"
-          echo "Password: ${{ github.event.inputs.access_password }}"
-          echo "=========================================="
-          sleep infinity
+          $ip = tailscale ip -4
+          Write-Host "=========================================="
+          Write-Host "PC Name (gia to Windows App): $ip"
+          Write-Host "Username: runneradmin"
+          Write-Host "Password: ${{ github.event.inputs.access_password }}"
+          Write-Host "=========================================="
+          Start-Sleep -Seconds 21500
