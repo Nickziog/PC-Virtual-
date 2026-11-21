@@ -1,0 +1,56 @@
+name: Virtual PC Online
+
+on:
+  workflow_dispatch:
+    inputs:
+      access_password:
+        description: 'Set a password for the user (minimum 6 characters)'
+        required: true
+        default: '123456'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure User Password
+        run: |
+          echo "runner:${{ github.event.inputs.access_password }}" | sudo chpasswd
+          sudo usermod -aG sudo runner
+
+      - name: Install Desktop Server and Tools
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies tightvncserver dbus-x11 firefox
+
+      - name: Install Ngrok
+        uses: ngrok/ngrok-action@v1
+        with:
+          auth-token: ${{ secrets.NGROK_AUTHTOKEN }}
+
+      - name: Start VNC Server
+        run: |
+          mkdir -p ~/.vnc
+          echo "${{ github.event.inputs.access_password }}" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
+          vncserver :1 -geometry 1280x720 -depth 24 &
+          echo "VNC Server started on port 5901"
+
+      - name: Expose VNC via Ngrok (TCP)
+        run: |
+          ngrok tcp 5901 --log=stdout > ngrok.log &
+          sleep 5
+          echo "=========================================="
+          echo "VNC Address:"
+          grep -o "tcp://[^ ]*" ngrok.log | sed 's|tcp://||'
+          echo "Password: ${{ github.event.inputs.access_password }}"
+          echo "=========================================="
+
+      - name: Keep Machine Active
+        run: |
+          echo "Virtual PC ready! Use a VNC client to connect."
+          sleep infinity
