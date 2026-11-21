@@ -24,19 +24,26 @@ jobs:
 
       - name: Install Desktop Server, VNC and Ngrok
         run: |
-          sudo apt update
-          sudo apt install -y xfce4 xfce4-goodies tightvncserver dbus-x11 firefox curl
-          curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt update && sudo apt install -y ngrok
-          ngrok config add-authtoken ${{ secrets.NGROK_AUTHTOKEN }}
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xfce4 xfce4-goodies tigervnc-standalone-server dbus-x11 firefox curl
+          curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o ngrok.tgz
+          sudo tar -xvzf ngrok.tgz -C /usr/local/bin
+          rm ngrok.tgz
+          ngrok config add-authtoken "${{ secrets.NGROK_AUTHTOKEN }}"
 
       - name: Start VNC Server
         run: |
           mkdir -p ~/.vnc
           echo "${{ github.event.inputs.access_password }}" | vncpasswd -f > ~/.vnc/passwd
           chmod 600 ~/.vnc/passwd
-          vncserver :1 -geometry 1280x720 -depth 24
+          cat << 'EOF' > ~/.vnc/xstartup
+          #!/bin/sh
+          unset SESSION_MANAGER
+          unset DBUS_SESSION_BUS_ADDRESS
+          exec startxfce4
+          EOF
+          chmod +x ~/.vnc/xstartup
+          vncserver :1 -geometry 1280x720 -depth 24 -localhost no
           echo "VNC Server started on port 5901"
 
       - name: Expose VNC via Ngrok (TCP)
