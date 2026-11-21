@@ -22,14 +22,15 @@ jobs:
           echo "runner:${{ github.event.inputs.access_password }}" | sudo chpasswd
           sudo usermod -aG sudo runner
 
-      - name: Install Desktop Server, VNC and Ngrok
+      - name: Install Desktop Server & VNC
         run: |
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xfce4 xfce4-goodies tigervnc-standalone-server dbus-x11 firefox curl
-          curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o ngrok.tgz
-          sudo tar -xvzf ngrok.tgz -C /usr/local/bin
-          rm ngrok.tgz
-          ngrok config add-authtoken "${{ secrets.NGROK_AUTHTOKEN }}"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xfce4 xfce4-goodies tigervnc-standalone-server dbus-x11 firefox
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
       - name: Start VNC Server
         run: |
@@ -46,17 +47,11 @@ jobs:
           vncserver :1 -geometry 1280x720 -depth 24 -localhost no
           echo "VNC Server started on port 5901"
 
-      - name: Expose VNC via Ngrok (TCP)
+      - name: Show VNC Info & Keep Active
         run: |
-          ngrok tcp 5901 --log=stdout > ngrok.log &
-          sleep 5
+          IP=$(tailscale ip -4)
           echo "=========================================="
-          echo "VNC Address:"
-          grep -o "tcp://[^ ]*" ngrok.log | sed 's|tcp://||'
+          echo "VNC Address (vale to sto RealVNC Viewer): ${IP}:5901"
           echo "Password: ${{ github.event.inputs.access_password }}"
           echo "=========================================="
-
-      - name: Keep Machine Active
-        run: |
-          echo "Virtual PC ready! Use a VNC client to connect."
           sleep infinity
